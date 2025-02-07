@@ -8,7 +8,6 @@ import subscriptionRoutes from './subscriptionRoutes.js'
 
 const router = new Router()
 
-router.use('/', 'HELLO')
 router.use('/user', userRoutes)
 router.use('/payment', paymentRoutes)
 router.use('/request', requestRoutes)
