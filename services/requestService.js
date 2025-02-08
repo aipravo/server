@@ -217,36 +217,6 @@ class RequestService {
 		return resp;
 	}
 
-	// async readFileContent(file) {
-	// 	const fileType = path.extname(file.originalname).toLowerCase();
-	// 	return new Promise((resolve, reject) => {
-	// 		try {
-	// 			if (fileType === '.pdf') {
-	// 				fs.readFile(file.path, async (err, pdfBuffer) => {
-	// 					if (err) {
-	// 						reject(`Error reading file ${file.originalname}: ${err}`);
-	// 					}
-	// 					const pdfData = await pdfParse(pdfBuffer);
-	// 					resolve(pdfData.text);
-	// 				});
-	// 			} else if (fileType === '.docx') {
-	// 				fs.readFile(file.path, async (err, docxBuffer) => {
-	// 					if (err) {
-	// 						reject(`Error reading file ${file.originalname}: ${err}`);
-	// 					}
-	// 					const result = await mammoth.extractRawText({ buffer: docxBuffer });
-	// 					resolve(result.value);
-	// 				});
-	// 			} else {
-	// 				reject(`Unsupported file type: ${fileType}`);
-	// 			}
-	// 		} catch (error) {
-	// 			console.error(`Error reading file ${file.originalname}:`, error);
-	// 			reject(`Failed to read file: ${file.originalname}`);
-	// 		}
-	// 	});
-	// }
-
 	async readFileContent(file) {
 		const fileType = path.extname(file.originalname).toLowerCase();
 		return new Promise((resolve, reject) => {
