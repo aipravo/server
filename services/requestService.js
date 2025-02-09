@@ -109,50 +109,41 @@ class RequestService {
 		}
 	}
 
-	async createMessage(thread_id, content, id, files) {
+	async createMessage(thread_id, content, id, files = []) {
 		try {
-
 			const messages = [];
 			const filePaths = [];
 			let fileContent = '';
 
-			// Если есть только текст
-			if (files.length === 0) {
-				messages.push({
-					role: 'user',
-					content,
-				});
+			// Если нет файлов, просто добавляем текст
+			if (!files?.length) {
+				messages.push({ role: 'user', content });
 				fileContent += content;
 			}
 
 			await fse.ensureDir('processed');
 
-			// Обрабатываем файлы
+			// Обработка файлов
 			for (const file of files) {
-				// Чтение содержимого файла
-				const readingContent = await this.readFileContent(file);
+				try {
+					const readingContent = await this.readFileContent(file);
+					fileContent += readingContent ? `\n--- Содержимое файла:\n${readingContent}\n` : 'Файл пуст';
 
-				if (!readingContent) {
-					fileContent += `Файл пуст`;
+					const extension = path.extname(file.originalname);
+					const fileName = `${uuidv4()}${extension}`;
+					const filePath = path.join('processed', fileName);
+
+					await fse.move(file.path, filePath);
+					filePaths.push(filePath);
+				} catch (error) {
+					console.error(`Ошибка обработки файла ${file.originalname}:`, error);
 				}
-				fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
-
-				const extension = path.extname(file.originalname);
-				const fileName = `${uuidv4()}${extension}`;
-				const filePath = path.join('processed', fileName);
-
-				await fse.move(file.path, filePath);
-
-				filePaths.push(filePath);
 			}
 
-			// Добавляем контент в сообщение
 			messages.push({
 				role: 'user',
-				content: `Данные из файлов: \n${fileContent}.\n\n\nМой вопрос или указание: ${content}`,
+				content: `Данные из файлов: \n${fileContent}.\n\n\nМой вопрос, требование или указание: ${content}`,
 			});
-
-
 
 			const assistant = await openai.beta.assistants.retrieve(
 				process.env.OPENAI_ASS
@@ -196,8 +187,9 @@ class RequestService {
 
 			return aiContent
 
-		} catch (e) {
-			throw e
+		} catch (error) {
+			console.error(`Ошибка в createMessage: ${error.message}`);
+			throw error;
 		}
 	}
 
@@ -221,62 +213,41 @@ class RequestService {
 	}
 
 	async readFileContent(file) {
-		const fileType = path.extname(file.originalname).toLowerCase();
-		return new Promise((resolve, reject) => {
-			try {
-				if (fileType === ".pdf") {
-					fs.readFile(file.path, async (err, pdfBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const pdfData = await pdfParse(pdfBuffer);
-						resolve(pdfData.text);
-					});
-				} else if (fileType === ".docx") {
-					fs.readFile(file.path, async (err, docxBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const result = await mammoth.extractRawText({ buffer: docxBuffer });
-						resolve(result.value);
-					});
-				}
-				else if (fileType === ".doc") {
-					const extractor = new WordExtractor();
-					extractor.extract(file.path)
-						.then(doc => resolve(doc.getBody()))
-						.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
-				}
-			} catch (error) {
-				console.error(`Error reading file ${file.originalname}:`, error);
-				reject(`Failed to read file: ${file.originalname}`);
+		try {
+			const fileType = path.extname(file.originalname).toLowerCase();
+			const filePath = file.path;
+
+			if (fileType === ".pdf") {
+				const pdfBuffer = await fs.promises.readFile(filePath);
+				const pdfData = await pdfParse(pdfBuffer);
+				return pdfData.text.trim() || null;
 			}
+
+			if (fileType === ".docx") {
+				const docxBuffer = await fs.promises.readFile(filePath);
+				const result = await mammoth.extractRawText({ buffer: docxBuffer });
+				return result.value.trim() || null;
+			}
+
+			if (fileType === ".doc") {
+				const extractor = new WordExtractor();
+				const doc = await extractor.extract(filePath);
+				return doc.getBody().trim() || null;
+			}
+
+			if ([".txt", ".csv", ".json"].includes(fileType)) {
+				const content = await fs.promises.readFile(filePath, "utf-8");
+				return content.trim() || null;
+			}
+
+			return "Неподдерживаемый формат файла";
+
+		} catch (error) {
+			console.error(`Ошибка при чтении файла ${file.originalname}:`, error);
+			return null;
 		}
-		);
 	}
 
-	// async readFileContent(file) {
-	// 	try {
-	// 		const fileType = path.extname(file.originalname).toLowerCase();
-
-	// 		if (fileType === ".pdf") {
-	// 			const pdfBuffer = fs.readFile(file.path);
-	// 			const pdfData = await pdfParse(pdfBuffer);
-	// 			return pdfData.text;
-	// 		}
-
-	// 		if (fileType === ".docx") {
-	// 			const docxBuffer = fs.readFile(file.path);
-	// 			const result = await mammoth.extractRawText({ buffer: docxBuffer });
-	// 			return result.value;
-	// 		}
-
-	// 		throw new Error(`Unsupported file type: ${fileType}`);
-	// 	} catch (error) {
-	// 		console.error(`Error reading file ${file.originalname}:`, error);
-	// 		throw new Error(`Failed to read file: ${file.originalname}`);
-	// 	}
-	// }
 
 	async getMessages(requestId) {
 		try {
