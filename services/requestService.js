@@ -220,62 +220,63 @@ class RequestService {
 		return resp;
 	}
 
+	async readFileContent(file) {
+		const fileType = path.extname(file.originalname).toLowerCase();
+		return new Promise((resolve, reject) => {
+			try {
+				if (fileType === ".pdf") {
+					fs.readFile(file.path, async (err, pdfBuffer) => {
+						if (err) {
+							return reject(`Error reading file ${file.originalname}: ${err}`);
+						}
+						const pdfData = await pdfParse(pdfBuffer);
+						resolve(pdfData.text);
+					});
+				} else if (fileType === ".docx") {
+					fs.readFile(file.path, async (err, docxBuffer) => {
+						if (err) {
+							return reject(`Error reading file ${file.originalname}: ${err}`);
+						}
+						const result = await mammoth.extractRawText({ buffer: docxBuffer });
+						resolve(result.value);
+					});
+				}
+				else if (fileType === ".doc") {
+					const extractor = new WordExtractor();
+					extractor.extract(file.path)
+						.then(doc => resolve(doc.getBody()))
+						.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
+				}
+			} catch (error) {
+				console.error(`Error reading file ${file.originalname}:`, error);
+				reject(`Failed to read file: ${file.originalname}`);
+			}
+		}
+		);
+	}
+
 	// async readFileContent(file) {
-	// 	const fileType = path.extname(file.originalname).toLowerCase();
-	// 	// return new Promise((resolve, reject) => {
 	// 	try {
+	// 		const fileType = path.extname(file.originalname).toLowerCase();
+
 	// 		if (fileType === ".pdf") {
-	// 			fs.readFile(file.path, async (err, pdfBuffer) => {
-	// 				if (err) {
-	// 					return reject(`Error reading file ${file.originalname}: ${err}`);
-	// 				}
-	// 				const pdfData = await pdfParse(pdfBuffer);
-	// 				resolve(pdfData.text);
-	// 			});
-	// 		} else if (fileType === ".docx") {
-	// 			fs.readFile(file.path, async (err, docxBuffer) => {
-	// 				if (err) {
-	// 					return reject(`Error reading file ${file.originalname}: ${err}`);
-	// 				}
-	// 				const result = await mammoth.extractRawText({ buffer: docxBuffer });
-	// 				resolve(result.value);
-	// 			});
+	// 			const pdfBuffer = fs.readFile(file.path);
+	// 			const pdfData = await pdfParse(pdfBuffer);
+	// 			return pdfData.text;
 	// 		}
-	// 		// else if (fileType === ".doc") {
-	// 		// 	const extractor = new WordExtractor();
-	// 		// 	extractor.extract(file.path)
-	// 		// 		.then(doc => resolve(doc.getBody()))
-	// 		// 		.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
-	// 		// } 
+
+	// 		if (fileType === ".docx") {
+	// 			const docxBuffer = fs.readFile(file.path);
+	// 			const result = await mammoth.extractRawText({ buffer: docxBuffer });
+	// 			return result.value;
+	// 		}
+
+	// 		throw new Error(`Unsupported file type: ${fileType}`);
 	// 	} catch (error) {
 	// 		console.error(`Error reading file ${file.originalname}:`, error);
-	// 		// reject(`Failed to read file: ${file.originalname}`);
+	// 		throw new Error(`Failed to read file: ${file.originalname}`);
 	// 	}
 	// }
-	// // );}
-
-	async readFileContent(file) {
-		try {
-			const fileType = path.extname(file.originalname).toLowerCase();
-
-			if (fileType === ".pdf") {
-				const pdfBuffer = fs.readFile(file.path);
-				const pdfData = await pdfParse(pdfBuffer);
-				return pdfData.text;
-			}
-
-			if (fileType === ".docx") {
-				const docxBuffer = fs.readFile(file.path);
-				const result = await mammoth.extractRawText({ buffer: docxBuffer });
-				return result.value;
-			}
-
-			throw new Error(`Unsupported file type: ${fileType}`);
-		} catch (error) {
-			console.error(`Error reading file ${file.originalname}:`, error);
-			throw new Error(`Failed to read file: ${file.originalname}`);
-		}
-	}
 
 	async getMessages(requestId) {
 		try {
