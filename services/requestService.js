@@ -131,12 +131,15 @@ class RequestService {
 			for (const file of files) {
 				// Чтение содержимого файла
 				const readingContent = await this.readFileContent(file);
+
+				if (!readingContent) {
+					fileContent += `\n--- Содержимое файла: \n`;
+				}
 				fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
 
 				const extension = path.extname(file.originalname);
 				const fileName = `${uuidv4()}${extension}`;
 				const filePath = path.join('processed', fileName);
-
 
 				await fse.move(file.path, filePath);
 
@@ -219,38 +222,37 @@ class RequestService {
 
 	async readFileContent(file) {
 		const fileType = path.extname(file.originalname).toLowerCase();
-		return new Promise((resolve, reject) => {
-			try {
-				if (fileType === ".pdf") {
-					fs.readFile(file.path, async (err, pdfBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const pdfData = await pdfParse(pdfBuffer);
-						resolve(pdfData.text);
-					});
-				} else if (fileType === ".docx") {
-					fs.readFile(file.path, async (err, docxBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const result = await mammoth.extractRawText({ buffer: docxBuffer });
-						resolve(result.value);
-					});
-				} else if (fileType === ".doc") {
-					const extractor = new WordExtractor();
-					extractor.extract(file.path)
-						.then(doc => resolve(doc.getBody()))
-						.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
-				} else {
-					reject(`Unsupported file type: ${fileType}`);
-				}
-			} catch (error) {
-				console.error(`Error reading file ${file.originalname}:`, error);
-				reject(`Failed to read file: ${file.originalname}`);
+		// return new Promise((resolve, reject) => {
+		try {
+			if (fileType === ".pdf") {
+				fs.readFile(file.path, async (err, pdfBuffer) => {
+					if (err) {
+						return reject(`Error reading file ${file.originalname}: ${err}`);
+					}
+					const pdfData = await pdfParse(pdfBuffer);
+					resolve(pdfData.text);
+				});
+			} else if (fileType === ".docx") {
+				fs.readFile(file.path, async (err, docxBuffer) => {
+					if (err) {
+						return reject(`Error reading file ${file.originalname}: ${err}`);
+					}
+					const result = await mammoth.extractRawText({ buffer: docxBuffer });
+					resolve(result.value);
+				});
 			}
-		});
+			// else if (fileType === ".doc") {
+			// 	const extractor = new WordExtractor();
+			// 	extractor.extract(file.path)
+			// 		.then(doc => resolve(doc.getBody()))
+			// 		.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
+			// } 
+		} catch (error) {
+			console.error(`Error reading file ${file.originalname}:`, error);
+			// reject(`Failed to read file: ${file.originalname}`);
+		}
 	}
+	// );}
 
 	async getMessages(requestId) {
 		try {
