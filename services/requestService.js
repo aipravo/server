@@ -13,7 +13,7 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 dotenv.config();
 
 const openai = new OpenAI({
-	apiKey: process.env.OPENAI_KEY || "ВАШ_API_KEY",
+	apiKey: process.env.OPENAI_KEY,
 });
 
 class RequestService {
@@ -109,15 +109,14 @@ class RequestService {
 		}
 	}
 
-	async createMessage(thread_id, content, id, files = []) {
+	async createMessage(thread_id, content, id, files) {
 		try {
 			const messages = [];
 			const filePaths = [];
 			let fileContent = '';
 
-			if (files.length === 0 || !files) {
+			if (!files || files.length === 0) {
 				messages.push({ role: 'user', content });
-				fileContent += content;
 			} else {
 				await fse.ensureDir('processed');
 
@@ -125,7 +124,9 @@ class RequestService {
 				for (const file of files) {
 					try {
 						const readingContent = await this.readFileContent(file);
-						fileContent += readingContent ? `\n--- Содержимое файла:\n${readingContent}\n` : '';
+						if (readingContent) {
+							fileContent += `${readingContent}`;
+						}
 
 						const extension = path.extname(file.originalname);
 						const fileName = `${uuidv4()}${extension}`;
@@ -138,10 +139,11 @@ class RequestService {
 					}
 				}
 
-				messages.push({
-					role: 'user',
-					content: `Данные из файлов: \n${fileContent}.\n\n\nМой вопрос, требование или указание: ${content}`,
-				});
+				const messageContent = fileContent
+					? `${fileContent}.\n\n\n${content}`
+					: content;
+
+				messages.push({ role: 'user', content: messageContent });
 			}
 
 			const assistant = await openai.beta.assistants.retrieve(
@@ -154,7 +156,7 @@ class RequestService {
 
 			await openai.beta.threads.messages.create(
 				thread.id,
-				...messages
+				messages[0]
 			);
 
 			const run = await openai.beta.threads.runs.create(
