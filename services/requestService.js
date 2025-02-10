@@ -115,35 +115,34 @@ class RequestService {
 			const filePaths = [];
 			let fileContent = '';
 
-			// Если нет файлов, просто добавляем текст
-			if (!files?.length) {
+			if (files.length === 0 || !files) {
 				messages.push({ role: 'user', content });
 				fileContent += content;
-			}
+			} else {
+				await fse.ensureDir('processed');
 
-			await fse.ensureDir('processed');
+				// Обработка файлов
+				for (const file of files) {
+					try {
+						const readingContent = await this.readFileContent(file);
+						fileContent += readingContent ? `\n--- Содержимое файла:\n${readingContent}\n` : '';
 
-			// Обработка файлов
-			for (const file of files) {
-				try {
-					const readingContent = await this.readFileContent(file);
-					fileContent += readingContent ? `\n--- Содержимое файла:\n${readingContent}\n` : 'Файл пуст';
+						const extension = path.extname(file.originalname);
+						const fileName = `${uuidv4()}${extension}`;
+						const filePath = path.join('processed', fileName);
 
-					const extension = path.extname(file.originalname);
-					const fileName = `${uuidv4()}${extension}`;
-					const filePath = path.join('processed', fileName);
-
-					await fse.move(file.path, filePath);
-					filePaths.push(filePath);
-				} catch (error) {
-					console.error(`Ошибка обработки файла ${file.originalname}:`, error);
+						await fse.move(file.path, filePath);
+						filePaths.push(filePath);
+					} catch (error) {
+						console.error(`Ошибка обработки файла ${file.originalname}:`, error);
+					}
 				}
-			}
 
-			messages.push({
-				role: 'user',
-				content: `Данные из файлов: \n${fileContent}.\n\n\nМой вопрос, требование или указание: ${content}`,
-			});
+				messages.push({
+					role: 'user',
+					content: `Данные из файлов: \n${fileContent}.\n\n\nМой вопрос, требование или указание: ${content}`,
+				});
+			}
 
 			const assistant = await openai.beta.assistants.retrieve(
 				process.env.OPENAI_ASS
