@@ -111,40 +111,45 @@ class RequestService {
 
 	async createMessage(thread_id, content, id, files) {
 		try {
+
 			const messages = [];
 			const filePaths = [];
 			let fileContent = '';
 
-			if (!files || files.length === 0) {
-				messages.push({ role: 'user', content });
-			} else {
-				await fse.ensureDir('processed');
-
-				// Обработка файлов
-				for (const file of files) {
-					try {
-						const readingContent = await this.readFileContent(file);
-						if (readingContent) {
-							fileContent += `${readingContent}`;
-						}
-
-						const extension = path.extname(file.originalname);
-						const fileName = `${uuidv4()}${extension}`;
-						const filePath = path.join('processed', fileName);
-
-						await fse.move(file.path, filePath);
-						filePaths.push(filePath);
-					} catch (error) {
-						console.error(`Ошибка обработки файла ${file.originalname}:`, error);
-					}
-				}
-
-				const messageContent = fileContent
-					? `${fileContent}.\n\n\n${content}`
-					: content;
-
-				messages.push({ role: 'user', content: messageContent });
+			// Если есть только текст
+			if (files.length === 0) {
+				messages.push({
+					role: 'user',
+					content,
+				});
+				fileContent += content;
 			}
+
+			await fse.ensureDir('processed');
+
+			// Обрабатываем файлы
+			for (const file of files) {
+				// Чтение содержимого файла
+				const readingContent = await this.readFileContent(file);
+				fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
+
+				const extension = path.extname(file.originalname);
+				const fileName = `${uuidv4()}${extension}`;
+				const filePath = path.join('processed', fileName);
+
+
+				await fse.move(file.path, filePath);
+
+				filePaths.push(filePath);
+			}
+
+			// Добавляем контент в сообщение
+			messages.push({
+				role: 'user',
+				content: `${content}\n\n\n${fileContent}`,
+			});
+
+
 
 			const assistant = await openai.beta.assistants.retrieve(
 				process.env.OPENAI_ASS
@@ -156,7 +161,7 @@ class RequestService {
 
 			await openai.beta.threads.messages.create(
 				thread.id,
-				messages[0]
+				...messages
 			);
 
 			const run = await openai.beta.threads.runs.create(
@@ -188,9 +193,8 @@ class RequestService {
 
 			return aiContent
 
-		} catch (error) {
-			console.error(`Ошибка в createMessage: ${error.message}`);
-			throw error;
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -214,39 +218,38 @@ class RequestService {
 	}
 
 	async readFileContent(file) {
-		try {
-			const fileType = path.extname(file.originalname).toLowerCase();
-			const filePath = file.path;
-
-			if (fileType === ".pdf") {
-				const pdfBuffer = await fs.promises.readFile(filePath);
-				const pdfData = await pdfParse(pdfBuffer);
-				return pdfData.text.trim() || null;
+		const fileType = path.extname(file.originalname).toLowerCase();
+		return new Promise((resolve, reject) => {
+			try {
+				if (fileType === ".pdf") {
+					fs.readFile(file.path, async (err, pdfBuffer) => {
+						if (err) {
+							return reject(`Error reading file ${file.originalname}: ${err}`);
+						}
+						const pdfData = await pdfParse(pdfBuffer);
+						resolve(pdfData.text);
+					});
+				} else if (fileType === ".docx") {
+					fs.readFile(file.path, async (err, docxBuffer) => {
+						if (err) {
+							return reject(`Error reading file ${file.originalname}: ${err}`);
+						}
+						const result = await mammoth.extractRawText({ buffer: docxBuffer });
+						resolve(result.value);
+					});
+				} else if (fileType === ".doc") {
+					const extractor = new WordExtractor();
+					extractor.extract(file.path)
+						.then(doc => resolve(doc.getBody()))
+						.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
+				} else {
+					reject(`Unsupported file type: ${fileType}`);
+				}
+			} catch (error) {
+				console.error(`Error reading file ${file.originalname}:`, error);
+				reject(`Failed to read file: ${file.originalname}`);
 			}
-
-			if (fileType === ".docx") {
-				const docxBuffer = await fs.promises.readFile(filePath);
-				const result = await mammoth.extractRawText({ buffer: docxBuffer });
-				return result.value.trim() || null;
-			}
-
-			if (fileType === ".doc") {
-				const extractor = new WordExtractor();
-				const doc = await extractor.extract(filePath);
-				return doc.getBody().trim() || null;
-			}
-
-			if ([".txt", ".csv", ".json"].includes(fileType)) {
-				const content = await fs.promises.readFile(filePath, "utf-8");
-				return content.trim() || null;
-			}
-
-			return "Неподдерживаемый формат файла";
-
-		} catch (error) {
-			console.error(`Ошибка при чтении файла ${file.originalname}:`, error);
-			return null;
-		}
+		});
 	}
 
 
