@@ -109,6 +109,78 @@ class RequestService {
 		}
 	}
 
+	async createAdminMessage(thread_id, content, id, files) {
+		try {
+			const filePaths = [];
+
+			const assistant = await openai.beta.assistants.retrieve(
+				process.env.OPENAI_ASS
+			);
+
+			if (files.length > 0) {
+
+				let fileIds = [];
+
+				for (const file of files) {
+					const extension = path.extname(file.originalname);
+					const fileName = `${uuidv4()}${extension}`;
+					const filePath = path.join("processed", fileName);
+
+					// Перемещаем файл перед созданием потока
+					await fse.move(file.path, filePath);
+					const fileStream = fs.createReadStream(filePath);
+
+					// Загружаем файл в OpenAI
+					const uploadedFile = await openai.files.create({
+						file: fileStream,
+						purpose: "assistants",
+					});
+
+					fileIds.push(uploadedFile.id);
+					filePaths.push(filePath);
+				}
+
+				// Добавляем файлы в Retrieval Tool, не удаляя старые
+				const currentFiles = assistant.tool_resources?.file_search?.file_ids || [];
+				await openai.beta.assistants.update(assistant.id, {
+					tool_resources: {
+						file_search: { file_ids: [...currentFiles, ...fileIds] },
+					},
+				});
+			}
+
+
+			await openai.beta.threads.messages.create(thread_id, {
+				role: "user",
+				content,
+			});
+
+
+			const run = await openai.beta.threads.runs.create(thread_id, {
+				assistant_id: assistant.id,
+			});
+
+			let runStatus;
+			do {
+				runStatus = await openai.beta.threads.runs.retrieve(thread_id, run.id);
+				await new Promise((resolve) => setTimeout(resolve, 2000)); // Ждем 2 секунды
+			} while (runStatus.status !== "completed");
+
+			const messages = await openai.beta.threads.messages.list(thread_id);
+			const aiMessage = messages.data.find((msg) => msg.role === "assistant");
+
+			await Message.create({ role: "user", files: filePaths, content, requestId: id });
+			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
+
+			return aiMessage.content[0].text.value
+
+
+		} catch (e) {
+			console.error(e);
+			throw e
+		}
+	}
+
 	async createMessage(thread_id, content, id, files) {
 		try {
 

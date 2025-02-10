@@ -17,6 +17,7 @@ router.delete('/delete/:id', checkRole('ADMIN'), authMiddleware, requestControll
 router.delete('/delete', checkRole('ADMIN'), authMiddleware, requestController.deleteRequestsByUserId)
 
 router.post('/send', authMiddleware, upload.array('files'), requestController.createMessage)
+router.post('/learn', authMiddleware, upload.array('files'), requestController.createAdminMessage)
 router.get('/messages/:requestId', authMiddleware, requestController.getMessages)
 router.get('/message/:requestId', authMiddleware, requestController.getFirstMessage)
 

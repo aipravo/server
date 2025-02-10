@@ -121,6 +121,20 @@ class RequestController {
 		}
 	}
 
+	async createAdminMessage(req, res, next) {
+		try {
+
+			const files = req.files
+
+			const { thread_id, content, id } = req.body
+
+			return res.json(await requestService.createAdminMessage(thread_id, content, id, files));
+
+		} catch (e) {
+			next(e)
+		}
+	}
+
 
 	async getMessages(req, res, next) {
 		try {
