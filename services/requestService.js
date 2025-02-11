@@ -74,22 +74,6 @@ class RequestService {
 		}
 	}
 
-	async createTrainRequest() {
-		try {
-
-			const thread_id = (await openai.beta.threads.create()).id;
-
-			if (!thread_id) {
-				throw ApiError.notFound('thread_id')
-			}
-
-			return thread_id
-
-		} catch (e) {
-			throw e
-		}
-	}
-
 	async updateAttempts(thread_id, userId) {
 		try {
 			const request = await Request.findOne({ where: { thread_id } });
