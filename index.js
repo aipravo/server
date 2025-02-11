@@ -29,6 +29,7 @@ app.use('/processed', express.static(path.join(__dirname, 'processed')))
 app.use(errorHandler)
 const start = async () => {
 	try {
+
 		await sequelize.authenticate();
 
 		await sequelize.sync();
@@ -38,6 +39,7 @@ const start = async () => {
 		app.listen(process.env.SERVER_PORT || 5000, () => {
 			console.log(`Server starting on port ${process.env.SERVER_PORT || 5000}`);
 		});
+
 	} catch (e) {
 		console.error('Error starting server:', e);
 	}
