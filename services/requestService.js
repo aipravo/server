@@ -235,6 +235,18 @@ class RequestService {
 				// await this.pollFileBatchStatus(vectorStoreId, batch.id);
 			}
 
+			const vectorStoreId = 'vs_67aa63b760dc819183cdb03a16b40e18';
+			await openai.beta.threads.update(
+				thread_id,
+				{
+					tool_resources: {
+						file_search: {
+							vector_store_ids: [vectorStoreId]
+						}
+					}
+				}
+			);
+
 			await openai.beta.threads.messages.create(thread_id, {
 				role: "user",
 				content: fileContent ? `${fileContent}\n ${content}` : content
