@@ -9,6 +9,8 @@ const upload = multer({ dest: 'uploads/' });
 
 router.post('/create', authMiddleware, requestController.createRequest)
 router.post('/createvip', authMiddleware, requestController.createVipRequest)
+router.post('/train', checkRole('ADMIN'), authMiddleware, requestController.createTrainRequest)
+
 router.post('/update', authMiddleware, requestController.updateAttempts)
 router.get('/get/:id', authMiddleware, requestController.getRequest)
 router.get('/get', authMiddleware, requestController.getRequests)
