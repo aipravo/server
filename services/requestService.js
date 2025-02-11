@@ -144,6 +144,17 @@ class RequestService {
 				const batch = await openai.beta.vectorStores.fileBatches.create(vectorStoreId, { file_ids: fileIds });
 
 				await this.pollFileBatchStatus(vectorStoreId, batch.id);
+
+				await openai.beta.threads.update(
+					thread_id,
+					{
+						tool_resources: {
+							file_search: {
+								vector_store_ids: [vectorStoreId]
+							}
+						}
+					}
+				);
 			}
 
 			const assistant = await openai.beta.assistants.retrieve(
