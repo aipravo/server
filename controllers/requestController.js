@@ -74,20 +74,6 @@ class RequestController {
 		}
 	}
 
-
-
-	async createTrainRequest(req, res, next) {
-		try {
-
-			const trear_id = await requestService.createTrainRequest()
-
-			return res.json(trear_id);
-
-		} catch (e) {
-			next(e)
-		}
-	}
-
 	async createVipRequest(req, res, next) {
 		try {
 
