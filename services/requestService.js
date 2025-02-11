@@ -4,10 +4,10 @@ import dotenv from 'dotenv';
 import ApiError from '../error/ApiError.js';
 import balanceService from './balanceService.js';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs'
+import * as fs from 'fs'
 import fse from 'fs-extra/esm'
 import mammoth from 'mammoth';
-import WordExtractor from 'word-extractor';
+// import WordExtractor from 'word-extractor';
 import path from 'path';
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 dotenv.config();
@@ -111,26 +111,25 @@ class RequestService {
 
 	async createAdminMessage(thread_id, content, id, files) {
 		try {
+			const fileIds = [];
 			const filePaths = [];
-
-			const assistant = await openai.beta.assistants.retrieve(
-				process.env.OPENAI_ASS
-			);
+			let fileContent = '';
 
 			if (files.length > 0) {
 
-				let fileIds = [];
 
 				for (const file of files) {
+					const readingContent = await this.readFileContent(file);
+					fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
+
 					const extension = path.extname(file.originalname);
 					const fileName = `${uuidv4()}${extension}`;
 					const filePath = path.join("processed", fileName);
 
-					// Перемещаем файл перед созданием потока
-					await fse.move(file.path, filePath);
-					const fileStream = fs.createReadStream(filePath);
-
 					// Загружаем файл в OpenAI
+					await fse.move(file.path, filePath);
+
+					const fileStream = fs.createReadStream(filePath);
 					const uploadedFile = await openai.files.create({
 						file: fileStream,
 						purpose: "assistants",
@@ -140,135 +139,220 @@ class RequestService {
 					filePaths.push(filePath);
 				}
 
-				// Добавляем файлы в Retrieval Tool, не удаляя старые
-				const currentFiles = assistant.tool_resources?.file_search?.file_ids || [];
-				await openai.beta.assistants.update(assistant.id, {
-					tool_resources: {
-						file_search: { file_ids: [...currentFiles, ...fileIds] },
-					},
-				});
+
+				const vectorStoreId = process.env.OPENAI_VS || 'vs_67aa63b760dc819183cdb03a16b40e18';
+				const batch = await openai.beta.vectorStores.fileBatches.create(vectorStoreId, { file_ids: fileIds });
+
+				await this.pollFileBatchStatus(vectorStoreId, batch.id);
 			}
-
-
-			await openai.beta.threads.messages.create(thread_id, {
-				role: "user",
-				content,
-			});
-
-
-			const run = await openai.beta.threads.runs.create(thread_id, {
-				assistant_id: assistant.id,
-			});
-
-			let runStatus;
-			do {
-				runStatus = await openai.beta.threads.runs.retrieve(thread_id, run.id);
-				await new Promise((resolve) => setTimeout(resolve, 2000)); // Ждем 2 секунды
-			} while (runStatus.status !== "completed");
-
-			const messages = await openai.beta.threads.messages.list(thread_id);
-			const aiMessage = messages.data.find((msg) => msg.role === "assistant");
-
-			await Message.create({ role: "user", files: filePaths, content, requestId: id });
-			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
-
-			return aiMessage.content[0].text.value
-
-
-		} catch (e) {
-			console.error(e);
-			throw e
-		}
-	}
-
-	async createMessage(thread_id, content, id, files) {
-		try {
-
-			const messages = [];
-			const filePaths = [];
-			let fileContent = '';
-
-			// Если есть только текст
-			if (files.length === 0) {
-				messages.push({
-					role: 'user',
-					content,
-				});
-				fileContent += content;
-			}
-
-			await fse.ensureDir('processed');
-
-			// Обрабатываем файлы
-			for (const file of files) {
-				// Чтение содержимого файла
-				const readingContent = await this.readFileContent(file);
-				fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
-
-				const extension = path.extname(file.originalname);
-				const fileName = `${uuidv4()}${extension}`;
-				const filePath = path.join('processed', fileName);
-
-
-				await fse.move(file.path, filePath);
-
-				filePaths.push(filePath);
-			}
-
-			// Добавляем контент в сообщение
-			messages.push({
-				role: 'user',
-				content: `${content}\n\n\n${fileContent}`,
-			});
-
-
 
 			const assistant = await openai.beta.assistants.retrieve(
 				process.env.OPENAI_ASS
 			);
 
-			const thread = await openai.beta.threads.retrieve(
-				thread_id
-			);
-
-			await openai.beta.threads.messages.create(
-				thread.id,
-				...messages
-			);
-
-			const run = await openai.beta.threads.runs.create(
-				thread.id,
-				{ assistant_id: assistant.id }
-			);
+			console.log(assistant);
 
 
-			const resp = await this.checkStatus(thread.id, run.id);
-			let aiContent;
-			// После завершения статуса completed
-			if (resp.status === 'completed') {
-				const messages = await openai.beta.threads.messages.list(
-					run.thread_id
-				);
-				for (const message of messages.data.reverse()) {
-					if (message.role === 'assistant') {
-						aiContent = message.content[0].text.value
-					}
-				}
-			}
+			await openai.beta.threads.messages.create(thread_id, {
+				role: "user",
+				content: fileContent ? `${fileContent}\n ${content}` : content
+			});
 
-			if (!aiContent) {
-				throw ApiError.badRequest('Ошибка ответа от AI')
-			} else {
-				await Message.create({ role: "user", files: filePaths, content, requestId: id });
-				await Message.create({ role: "assistant", content: aiContent, requestId: id });
-			}
+			// Запускаем ассистента
+			const run = await openai.beta.threads.runs.create(thread_id, {
+				assistant_id: process.env.OPENAI_ASS,
+			});
 
-			return aiContent
+			// Ждем завершения работы ассистента
+			let runStatus;
+			do {
+				runStatus = await openai.beta.threads.runs.retrieve(thread_id, run.id);
+				await new Promise((resolve) => setTimeout(resolve, 1000)); // Ждем 2 секунды
+			} while (runStatus.status !== "completed");
 
+			// Получаем ответ ассистента
+			const messages = await openai.beta.threads.messages.list(thread_id);
+			const aiMessage = messages.data.find((msg) => msg.role === "assistant");
+
+			// Сохраняем в БД
+			await Message.create({ role: "user", files: filePaths, content, requestId: id });
+			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
+
+			return aiMessage.content[0].text.value.replace(/\【.*?\】/g, '');
 		} catch (e) {
-			throw e
+			console.error(e);
+			throw e;
 		}
 	}
+
+	async createMessage(thread_id, content, id, files) {
+		try {
+			const fileIds = [];
+			const filePaths = [];
+			let fileContent = '';
+
+			if (files.length > 0) {
+
+
+				for (const file of files) {
+
+					const readingContent = await this.readFileContent(file);
+					fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
+
+					await fse.ensureDir('processed');
+					const extension = path.extname(file.originalname);
+					const fileName = `${uuidv4()}${extension}`;
+					const filePath = path.join("processed", fileName);
+
+					// Загружаем файл в OpenAI
+					await fse.move(file.path, filePath);
+
+					const fileStream = fs.createReadStream(filePath);
+					const uploadedFile = await openai.files.create({
+						file: fileStream,
+						purpose: "assistants",
+					});
+
+					fileIds.push(uploadedFile.id);
+					filePaths.push(filePath);
+				}
+
+
+				// const vectorStoreId = 'vs_67aa5327eb388191baf9006737340acf';
+				// const batch = await openai.beta.vectorStores.fileBatches.create(vectorStoreId, { file_ids: fileIds });
+
+				// await this.pollFileBatchStatus(vectorStoreId, batch.id);
+			}
+
+			await openai.beta.threads.messages.create(thread_id, {
+				role: "user",
+				content: fileContent ? `${fileContent}\n ${content}` : content
+			});
+
+			// Запускаем ассистента
+			const run = await openai.beta.threads.runs.create(thread_id, {
+				assistant_id: process.env.OPENAI_ASS,
+			});
+
+			// Ждем завершения работы ассистента
+			let runStatus;
+			do {
+				runStatus = await openai.beta.threads.runs.retrieve(thread_id, run.id);
+				await new Promise((resolve) => setTimeout(resolve, 1000)); // Ждем 2 секунды
+			} while (runStatus.status !== "completed");
+
+			// Получаем ответ ассистента
+			const messages = await openai.beta.threads.messages.list(thread_id);
+			const aiMessage = messages.data.find((msg) => msg.role === "assistant");
+
+			// Сохраняем в БД
+			await Message.create({ role: "user", files: filePaths, content, requestId: id });
+			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
+
+			return aiMessage.content[0].text.value.replace(/\【.*?\】/g, '');
+		} catch (e) {
+			console.error(e);
+			throw e;
+		}
+	}
+
+	async pollFileBatchStatus(vectorStoreId, batchId) {
+		let batchStatus;
+		do {
+			batchStatus = await openai.beta.vectorStores.fileBatches.retrieve(vectorStoreId, batchId);
+			console.log(`Индексация файлов: ${batchStatus.status}`);
+			await new Promise(resolve => setTimeout(resolve, 1000)); // Ждать 3 сек
+		} while (batchStatus.status !== "completed");
+	}
+
+	// async createMessage(thread_id, content, id, files) {
+	// 	try {
+
+	// 		const messages = [];
+	// 		const filePaths = [];
+	// 		let fileContent = '';
+
+	// 		// Если есть только текст
+	// 		if (files.length === 0) {
+	// 			messages.push({
+	// 				role: 'user',
+	// 				content,
+	// 			});
+	// 			fileContent += content;
+	// 		}
+
+	// 		await fse.ensureDir('processed');
+
+	// 		// Обрабатываем файлы
+	// 		for (const file of files) {
+	// 			// Чтение содержимого файла
+	// 			const readingContent = await this.readFileContent(file);
+	// 			fileContent += `\n--- Содержимое файла:\n${readingContent}\n`;
+
+	// 			const extension = path.extname(file.originalname);
+	// 			const fileName = `${uuidv4()}${extension}`;
+	// 			const filePath = path.join('processed', fileName);
+
+
+	// 			await fse.move(file.path, filePath);
+
+	// 			filePaths.push(filePath);
+	// 		}
+
+	// 		// Добавляем контент в сообщение
+	// 		messages.push({
+	// 			role: 'user',
+	// 			content: `${content}\n\n\n${fileContent}`,
+	// 		});
+
+
+
+	// 		const assistant = await openai.beta.assistants.retrieve(
+	// 			process.env.OPENAI_ASS
+	// 		);
+
+	// 		const thread = await openai.beta.threads.retrieve(
+	// 			thread_id
+	// 		);
+
+	// 		await openai.beta.threads.messages.create(
+	// 			thread.id,
+	// 			...messages
+	// 		);
+
+	// 		const run = await openai.beta.threads.runs.create(
+	// 			thread.id,
+	// 			{ assistant_id: assistant.id }
+	// 		);
+
+
+	// 		const resp = await this.checkStatus(thread.id, run.id);
+	// 		let aiContent;
+	// 		// После завершения статуса completed
+	// 		if (resp.status === 'completed') {
+	// 			const messages = await openai.beta.threads.messages.list(
+	// 				run.thread_id
+	// 			);
+	// 			for (const message of messages.data.reverse()) {
+	// 				if (message.role === 'assistant') {
+	// 					aiContent = message.content[0].text.value
+	// 				}
+	// 			}
+	// 		}
+
+	// 		if (!aiContent) {
+	// 			throw ApiError.badRequest('Ошибка ответа от AI')
+	// 		} else {
+	// 			await Message.create({ role: "user", files: filePaths, content, requestId: id });
+	// 			await Message.create({ role: "assistant", content: aiContent, requestId: id });
+	// 		}
+
+	// 		return aiContent
+
+	// 	} catch (e) {
+	// 		throw e
+	// 	}
+	// }
 
 
 	async checkStatus(thread_id, run_id) {
@@ -290,39 +374,53 @@ class RequestService {
 	}
 
 	async readFileContent(file) {
-		const fileType = path.extname(file.originalname).toLowerCase();
-		return new Promise((resolve, reject) => {
-			try {
-				if (fileType === ".pdf") {
-					fs.readFile(file.path, async (err, pdfBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const pdfData = await pdfParse(pdfBuffer);
-						resolve(pdfData.text);
-					});
-				} else if (fileType === ".docx") {
-					fs.readFile(file.path, async (err, docxBuffer) => {
-						if (err) {
-							return reject(`Error reading file ${file.originalname}: ${err}`);
-						}
-						const result = await mammoth.extractRawText({ buffer: docxBuffer });
-						resolve(result.value);
-					});
-				} else if (fileType === ".doc") {
-					const extractor = new WordExtractor();
-					extractor.extract(file.path)
-						.then(doc => resolve(doc.getBody()))
-						.catch(err => reject(`Error reading file ${file.originalname}: ${err}`));
-				} else {
-					reject(`Unsupported file type: ${fileType}`);
-				}
-			} catch (error) {
-				console.error(`Error reading file ${file.originalname}:`, error);
-				reject(`Failed to read file: ${file.originalname}`);
+		try {
+			const fileType = path.extname(file.originalname).toLowerCase();
+			const fileBuffer = fs.readFileSync(file.path);
+
+			if (fileType === ".pdf") {
+				const pdfData = await pdfParse(fileBuffer);
+				return pdfData.text;
+			} else if (fileType === ".docx") {
+				const result = await mammoth.extractRawText({ buffer: fileBuffer });
+				return result.value;
+			} else {
+				throw new Error(`Unsupported file type: ${fileType}`);
 			}
-		});
+		} catch (error) {
+			console.error(`Error reading file ${file.originalname}:`, error);
+			throw new Error(`Failed to read file: ${file.originalname}`);
+		}
 	}
+	// async readFileContent(file) {
+	// 	const fileType = path.extname(file.originalname).toLowerCase();
+	// 	return new Promise((resolve, reject) => {
+	// 		try {
+	// 			if (fileType === ".pdf") {
+	// 				fs.readFile(file.path, async (err, pdfBuffer) => {
+	// 					if (err) {
+	// 						return reject(`Error reading file ${file.originalname}: ${err}`);
+	// 					}
+	// 					const pdfData = await pdfParse(pdfBuffer);
+	// 					resolve(pdfData.text);
+	// 				});
+	// 			} else if (fileType === ".docx") {
+	// 				fs.readFile(file.path, async (err, docxBuffer) => {
+	// 					if (err) {
+	// 						return reject(`Error reading file ${file.originalname}: ${err}`);
+	// 					}
+	// 					const result = await mammoth.extractRawText({ buffer: docxBuffer });
+	// 					resolve(result.value);
+	// 				});
+	// 			} else {
+	// 				reject(`Unsupported file type: ${fileType}`);
+	// 			}
+	// 		} catch (error) {
+	// 			console.error(`Error reading file ${file.originalname}:`, error);
+	// 			reject(`Failed to read file: ${file.originalname}`);
+	// 		}
+	// 	});
+	// }
 
 
 	async getMessages(requestId) {
