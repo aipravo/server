@@ -24,7 +24,7 @@ class UserService {
 				expiresIn: "24h",
 			});
 
-			const confirmLink = `https://aipravo.kz/user/confirm/${token}`;
+			const confirmLink = `https://aipravo.kz/api/user/confirm/${token}`;
 
 			const html = `
 				<table
@@ -84,7 +84,7 @@ class UserService {
 				expiresIn: "1h",
 			});
 
-			const confirmLink = `${process.env.CLIENT_URL}/reset/${token}`;
+			const confirmLink = `https://aipravo.kz/reset/${token}`;
 
 			const html = `
 				<table
