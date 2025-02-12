@@ -189,7 +189,8 @@ class RequestService {
 			await Message.create({ role: "user", files: filePaths, content, requestId: id });
 			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
 
-			return aiMessage.content[0].text.value.replace(/\【.*?\】/g, '');
+			// return aiMessage.content[0].text.value.replace(/\【.*?\】/g, '');
+			return aiMessage.content[0].text.value.replace(/【[^】]*】/g, '');
 		} catch (e) {
 			console.error(e);
 			throw e;
@@ -272,7 +273,7 @@ class RequestService {
 			await Message.create({ role: "user", files: filePaths, content, requestId: id });
 			await Message.create({ role: "assistant", content: aiMessage.content[0].text.value, requestId: id });
 
-			return aiMessage.content[0].text.value.replace(/\【.*?\】/g, '');
+			return aiMessage.content[0].text.value.replace(/【[^】]*】/g, '');
 		} catch (e) {
 			console.error(e);
 			throw e;
