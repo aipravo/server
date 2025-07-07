@@ -7,11 +7,8 @@ import checkRole from '../middleware/checkRoleMiddleware.js'
 const router = new Router()
 const upload = multer({ dest: 'uploads/' });
 
-// router.post('/create', authMiddleware, requestController.createRequest)
-// router.post('/createvip', authMiddleware, requestController.createVipRequest)
-
-router.post('/create', requestController.createRequest)
-router.post('/createvip', requestController.createVipRequest)
+router.post('/create', authMiddleware, requestController.createRequest)
+router.post('/createvip', authMiddleware, requestController.createVipRequest)
 
 router.post('/update', authMiddleware, requestController.updateAttempts)
 router.get('/get/:id', authMiddleware, requestController.getRequest)
