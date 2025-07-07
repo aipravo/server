@@ -26,7 +26,8 @@ app.use('/api', router);
 
 app.use('/processed', express.static(path.join(__dirname, 'processed')))
 
-app.use(errorHandler)
+// app.use(errorHandler)
+
 const start = async () => {
 	try {
 
