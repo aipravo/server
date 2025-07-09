@@ -22,7 +22,7 @@ class UserController {
 		try {
 			const { email, password, confirmPassword } = req.body;
 
-			console.log(email, password, confirmPassword)
+
 
 			const existingUser = await User.findOne({ where: { email } });
 			if (existingUser) {
@@ -46,6 +46,8 @@ class UserController {
 			}
 
 			const html = await userService.registration(email, password)
+
+			console.log(html)
 
 			await mailService.sendEmail(email, 'Подтверждение регистрации', html)
 
