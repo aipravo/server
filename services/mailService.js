@@ -1,23 +1,24 @@
 import nodemailer from 'nodemailer'
 import dotenv from 'dotenv';
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 dotenv.config();
 
 class MailService {
 	constructor() {
 		this.transporter = nodemailer.createTransport({
 			host: 'smtp.gmail.com',
-			port: 465,
-			secure: true, // true — для 465
+			port: 587,              // ✅ 587 предпочтительнее, чем 465
+			secure: false,          // ✅ обязательно false для 587
 			auth: {
 				user: process.env.EMAIL_USER,
-				pass: process.env.EMAIL_PASSWORD,
+				pass: process.env.EMAIL_PASSWORD, // должен быть пароль приложения!
 			},
 			tls: {
-				// временно для отладки
-				rejectUnauthorized: false
+				rejectUnauthorized: false, // временно можно оставить true, если будет ошибка сертификата
 			},
 			logger: true,
-			debug: true
+			debug: true,
 		});
 
 	}
