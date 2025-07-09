@@ -75,10 +75,6 @@ class RequestController {
 	}
 
 	async createVipRequest(req, res, next) {
-
-		console.log(req, res);
-
-
 		try {
 
 			const userId = req.user.id

@@ -47,7 +47,6 @@ class UserController {
 
 			const html = await userService.registration(email, password)
 
-			console.log(html)
 
 			await mailService.sendEmail(email, 'Подтверждение регистрации', html)
 

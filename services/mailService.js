@@ -5,14 +5,21 @@ dotenv.config();
 class MailService {
 	constructor() {
 		this.transporter = nodemailer.createTransport({
-			host: process.env.EMAIL_HOST,
-			port: process.env.EMAIL_PORT,
-			secure: true,
+			host: 'smtp.gmail.com',
+			port: 465,
+			secure: true, // true — для 465
 			auth: {
 				user: process.env.EMAIL_USER,
-				pass: process.env.EMAIL_PASSWORD
-			}
-		})
+				pass: process.env.EMAIL_PASSWORD,
+			},
+			tls: {
+				// временно для отладки
+				rejectUnauthorized: false
+			},
+			logger: true,
+			debug: true
+		});
+
 	}
 
 	async sendEmail(to, subject, html) {
