@@ -7,29 +7,33 @@ dotenv.config();
 class MailService {
 	constructor() {
 		this.transporter = nodemailer.createTransport({
-			host: 'smtp.gmail.com',
-			port: 587,              // ✅ 587 предпочтительнее, чем 465
-			secure: false,          // ✅ обязательно false для 587
+			host: process.env.EMAIL_HOST,
+			port: Number(process.env.EMAIL_PORT),
+			secure: true, // 465 = secure:true
 			auth: {
 				user: process.env.EMAIL_USER,
-				pass: process.env.EMAIL_PASSWORD, // должен быть пароль приложения!
+				pass: process.env.EMAIL_PASSWORD
 			},
 			tls: {
-				rejectUnauthorized: false, // временно можно оставить true, если будет ошибка сертификата
+				rejectUnauthorized: false // На случай проблем с сертификатом
 			},
 			logger: true,
-			debug: true,
+			debug: true
 		});
-
 	}
 
 	async sendEmail(to, subject, html) {
-		await this.transporter.sendMail({
-			from: `"AIПраво" <${process.env.EMAIL_USER}>`,
-			to,
-			subject,
-			html,
-		});
+		try {
+			const info = await this.transporter.sendMail({
+				from: `"AIПраво" <${process.env.EMAIL_USER}>`,
+				to,
+				subject,
+				html,
+			});
+			console.log('Email sent:', info.messageId);
+		} catch (error) {
+			console.error('Error sending email:', error);
+		}
 	}
 }
 
