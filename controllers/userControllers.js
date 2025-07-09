@@ -48,7 +48,7 @@ class UserController {
 			const html = await userService.registration(email, password)
 
 
-			await mailService.sendEmail(email, 'Подтверждение регистрации', html)
+			// await mailService.sendEmail(email, 'Подтверждение регистрации', html)
 
 			return res.json({ message: "Пожалуйста, перейдите по ссылке, отправленной на вашу электронную почту, чтобы завершить регистрацию" })
 		} catch (e) {
