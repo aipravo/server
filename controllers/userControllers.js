@@ -46,11 +46,12 @@ class UserController {
 			}
 
 			const html = await userService.registration(email, password)
+			const link = `<a href="${html}">ссылке</a>`
 
 
 			await mailService.sendEmail(email, 'Подтверждение регистрации', html)
 
-			return res.json({ message: "Пожалуйста, перейдите по ссылке, отправленной на вашу электронную почту, чтобы завершить регистрацию" })
+			return res.json({ message: `Пожалуйста, перейдите по ${link}, чтобы завершить регистрацию` })
 		} catch (e) {
 			next(ApiError.badRequest(e))
 		}

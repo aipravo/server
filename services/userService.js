@@ -24,48 +24,48 @@ class UserService {
 				expiresIn: "24h",
 			});
 
-			const confirmLink = `https://api.aipravo.kz/api/user/confirm/${token}`;
+			const html = `https://api.aipravo.kz/api/user/confirm/${token}`;
 
-			const html = `
-				<table
-					style="
-						width: 100%;
-						height: 100%;
-						min-height: 300px;
-						text-align: center;
-						background-color: #f3f3f3;
-					"
-				>
-					<tr>
-						<td
-							style="
-								text-align: center;
-								vertical-align: middle;
-								padding: 20px;
-							"
-						>
-							<a
-								href="${confirmLink}"
-								style="
-									display: inline-block;
-									width: 280px;
-									height: 48px;
-									border: 1px solid #424242;
-									background-color: #424242;
-									color: #ffffff;
-									font-size: 16px;
-									line-height: 48px;
-									text-align: center;
-									text-decoration: none;
-									border-radius: 4px;
-								"
-							>
-								Подтвердите ваш Email
-							</a>
-						</td>
-					</tr>
-				</table>
-			`
+			// const html = `
+			// 	<table
+			// 		style="
+			// 			width: 100%;
+			// 			height: 100%;
+			// 			min-height: 300px;
+			// 			text-align: center;
+			// 			background-color: #f3f3f3;
+			// 		"
+			// 	>
+			// 		<tr>
+			// 			<td
+			// 				style="
+			// 					text-align: center;
+			// 					vertical-align: middle;
+			// 					padding: 20px;
+			// 				"
+			// 			>
+			// 				<a
+			// 					href="${confirmLink}"
+			// 					style="
+			// 						display: inline-block;
+			// 						width: 280px;
+			// 						height: 48px;
+			// 						border: 1px solid #424242;
+			// 						background-color: #424242;
+			// 						color: #ffffff;
+			// 						font-size: 16px;
+			// 						line-height: 48px;
+			// 						text-align: center;
+			// 						text-decoration: none;
+			// 						border-radius: 4px;
+			// 					"
+			// 				>
+			// 					Подтвердите ваш Email
+			// 				</a>
+			// 			</td>
+			// 		</tr>
+			// 	</table>
+			// `
 
 			return html
 		} catch (e) {
