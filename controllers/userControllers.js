@@ -22,6 +22,8 @@ class UserController {
 		try {
 			const { email, password, confirmPassword } = req.body;
 
+			console.log(email, password, confirmPassword)
+
 			const existingUser = await User.findOne({ where: { email } });
 			if (existingUser) {
 				return next(ApiError.badRequest('Email уже зарегистрирован!'))
