@@ -1,33 +1,24 @@
-import nodemailer from 'nodemailer'
 import dotenv from 'dotenv';
+import sgMail from '@sendgrid/mail';
+
 dotenv.config();
 
-class MailService {
-	constructor() {
-		this.transporter = nodemailer.createTransport({
-			host: process.env.EMAIL_HOST,
-			port: 587,
-			secure: false, // 465 = secure:true
-			auth: {
-				user: process.env.EMAIL_USER,
-				pass: process.env.EMAIL_PASS
-			},
-			logger: true,
-			debug: true
-		});
-	}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+class MailService {
 	async sendEmail(to, subject, html) {
+		const msg = {
+			to,
+			from: process.env.SENDGRID_FROM,
+			subject,
+			html,
+		};
+
 		try {
-			const info = await this.transporter.sendMail({
-				from: `"AIПраво" <${process.env.EMAIL_USER}>`,
-				to,
-				subject,
-				html,
-			});
-			console.log('Email sent:', info.messageId);
+			const response = await sgMail.send(msg);
+			console.log('Email sent via SendGrid:', response[0].statusCode);
 		} catch (error) {
-			console.error('Error sending email:', error);
+			console.error('SendGrid error:', error.response?.body || error.message);
 		}
 	}
 }
