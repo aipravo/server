@@ -1,14 +1,14 @@
 import dotenv from 'dotenv';
 import sgMail from '@sendgrid/mail';
-import client from '@sendgrid/client';
+// import client from '@sendgrid/client';
 
 dotenv.config();
 
 class MailService {
 	constructor() {
-		client.setDataResidency('global');
+		// client.setDataResidency('global');
 		sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-		sgMail.setClient(client);
+		// sgMail.setClient(client);
 	}
 
 	async sendEmail(to, subject, html) {
