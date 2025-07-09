@@ -1,7 +1,5 @@
 import nodemailer from 'nodemailer'
 import dotenv from 'dotenv';
-import dns from 'dns';
-dns.setDefaultResultOrder('ipv4first');
 dotenv.config();
 
 class MailService {
