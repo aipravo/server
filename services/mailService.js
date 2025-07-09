@@ -1,16 +1,22 @@
 import dotenv from 'dotenv';
 import sgMail from '@sendgrid/mail';
+import client from '@sendgrid/client';
 
 dotenv.config();
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 class MailService {
+	constructor() {
+		client.setDataResidency('global');
+		sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+		sgMail.setClient(client);
+	}
+
 	async sendEmail(to, subject, html) {
 		const msg = {
 			to,
-			from: process.env.SENDGRID_FROM,
+			from: process.env.SENDGRID_FROM, // ← должен быть подтверждён
 			subject,
+			text: html.replace(/<[^>]*>/g, ''),
 			html,
 		};
 
@@ -22,5 +28,6 @@ class MailService {
 		}
 	}
 }
+
 
 export default new MailService();
